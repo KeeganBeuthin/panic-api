@@ -1,13 +1,20 @@
 import {OpenAPIBackend} from 'openapi-backend';;
 import express from 'express';
 import postgres from 'postgres';
+import Ajv from "ajv"
+import addFormats from "ajv-formats"
 
 
+
+const ajv = new Ajv()
+addFormats(ajv)
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 const sql = postgres('postgres://Rat:hahaha@127.0.0.1:5432/Rat')
+
 
 
 //functions cause im dumb
@@ -54,93 +61,130 @@ const api = new OpenAPIBackend({
         get: {
           operationId: 'getTransactions',
           responses: {
-            200: { description: 'ok' },
+            200: { description: 'ok',
+          content:{
+            'application/json':{
+              schema:{
+                $ref: '#/components/schemas/Transaction'
+              }
+            }
+          }},
           },
       },
-      post: {
-        operationId: 'postTransaction',
-        requestBody: {
+  },
+  '/transactions/create':{
+    post: {
+      operationId: 'postTransaction',
+      requestBody: {
         content: {
           'application/json': {
-            schema: {
-              $ref: '#/components/schemas/Transaction'
-            },
-          },
-        },
-
-        },
-        responses: {
-          200: {description: 'Valid'}
+          }
         }
+      },
+      responses: {
+        200: {description: 'ok'}
+      },
     },
   },
       '/transactions/{id}': {
         get: {
           operationId: 'getTransactionById',
-          responses: {
-            200: { description: 'ok' },
-          },
-        
-        
-        parameters: [
-          {
-            name: 'id',
-            in: 'path',
-            required: true,
-            schema: {
-              type: 'integer',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              schema: {
+                type: 'integer',
+               
+              },
+              required: true
             },
+          ],
+          responses: {
+            200: { description: 'ok',
+            content:{
+              'application/json':{
+                schema:{
+                  $ref: '#/components/schemas/Transaction'
+                }
+              }
+            }},
           },
-        ],
+      },
+    },
+    
+  },
+  components: {
+    schemas: {
+      Transaction: {
+        $ref: '#/components/schemas/TransactionProperties'
+      },
+      TransactionProperties: {
+        type: 'object',
+        properties: {
+          id: {
+            type: 'integer',
+          },
+          create_time:{
+            type: 'string',
+          },
+          name:{
+            type: 'string'
+          },
+          value: {
+            type: 'integer'
+          }
+        },
+        required: ['id', 'create_time', 'name', 'value'],
       },
     },
   },
-  components: {
-schemas: {
-  Transaction: {
-type: 'object',
-properties: {
-  id: {
-    type: 'integer'
-  },
-  amount: {
-    type: 'integer'
-  }
 },
-required: ['id', 'name', 'create_time']
-},
-},
-  },
-  },
   handlers: {
-    async postTransaction() {
-      const id = await generateUniqueId()
-  
+
+    async postTransaction(c, req, res) {
+      const {name}= req.body;
+      const id= await generateUniqueId()
+     console.log(req.body)
+     
+      
+      const value = generateSequence();
+
   const result = await sql`
-    INSERT INTO transactions (id, create_time, name, value) VALUES (${id}, now(), ${'Mathew'}, ${value})
+    INSERT INTO transactions (id, create_time, name, value) VALUES (${id}, now(), ${name}, ${value})
   `
   
   console.log(`New transaction created with ID ${id} and Value ${value}`)
-  return result
+  return res.status(200).json({data: id, value, name,})
       
     },
 
     
-    async getTransactionById(id) {
-      const transaction = await sql`
-      select * from transactions where id= ${55606}`
-      console.log(transaction)
-      return transaction
-    } ,
-
-   async getTransactions(){
-
-      const transactions = await sql`
-      select * from transactions`
-      console.log(transactions)
-      return transactions
+    async getTransactionById(c, req, res) {
       
-  },
+      const {id}= parseInt(req.params.id);
+      console.log(req.params);
+      const transaction = await sql`
+        SELECT * FROM transactions WHERE id = ${id}
+      `;
+      console.log("transaction:", transaction);
+      if (transaction.length === 0) {
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+      
+      return res.status(200).json({ data: transaction });
+    },
+
+    async getTransactions(c, req, res) {
+      const transaction = await sql`
+        SELECT * FROM transactions 
+      `;
+      if (transaction.length === 0) {
+        return res.status(404).json({ error: 'Transactions not found' });
+      }
+      return res.status(200).json({ data: transaction });
+    },
+    
     
     
     

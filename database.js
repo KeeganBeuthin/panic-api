@@ -1,6 +1,5 @@
 import postgres from 'postgres'
-export const sql = postgres('postgres://Rat:hahaha@127.0.0.1:5432/Rat'
-)
+export  const sql = postgres('postgres://Rat:hahaha@127.0.0.1:5432/Rat')
 
 
 export async function getTransactions(){
@@ -55,7 +54,7 @@ async function createTransaction() {
   const id = await generateUniqueId()
   
   const result = await sql`
-    INSERT INTO transactions (id, create_time, name, value) VALUES (${id}, now(), ${'Mathew'}, ${value})
+    INSERT INTO transactions (id, create_time, name, value) VALUES (${id}, now(), ${'dwayne'}, ${value})
   `
   
   console.log(`New transaction created with ID ${id} and Value ${value}`)
