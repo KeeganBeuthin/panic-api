@@ -1,8 +1,9 @@
 import {OpenAPIBackend} from 'openapi-backend';;
-import express from 'express';
+import express, { query } from 'express';
 import postgres from 'postgres';
 import Ajv from "ajv"
 import addFormats from "ajv-formats"
+import bodyParser from 'body-parser'
 
 
 
@@ -15,6 +16,10 @@ app.use(express.urlencoded({ extended: true }));
 
 const sql = postgres('postgres://Rat:hahaha@127.0.0.1:5432/Rat')
 
+
+
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json())
 
 
 //functions cause im dumb
@@ -57,7 +62,7 @@ const api = new OpenAPIBackend({
       version: '1.0.0',
     },
     paths: {
-      '/transactions': {
+      '/transaction': {
         get: {
           operationId: 'getTransactions',
           responses: {
@@ -72,7 +77,7 @@ const api = new OpenAPIBackend({
           },
       },
   },
-  '/transactions/create':{
+  '/transaction/create':{
     post: {
       operationId: 'postTransaction',
       requestBody: {
@@ -86,20 +91,9 @@ const api = new OpenAPIBackend({
       },
     },
   },
-      '/transactions/{id}': {
+      '/transaction/{id}': {
         get: {
           operationId: 'getTransactionById',
-          parameters: [
-            {
-              name: 'id',
-              in: 'path',
-              schema: {
-                type: 'integer',
-               
-              },
-              required: true
-            },
-          ],
           responses: {
             200: { description: 'ok',
             content:{
@@ -111,6 +105,16 @@ const api = new OpenAPIBackend({
             }},
           },
       },
+      parameters: [
+        {
+          name: 'id',
+          in: 'path',
+          schema: {
+            type: 'integer',
+          },
+          required: true
+        },
+      ],
     },
     
   },
@@ -160,22 +164,27 @@ const api = new OpenAPIBackend({
     },
 
     
-    async getTransactionById(c, req, res) {
+     getTransactionById: async (c, req, res, ) => {
       
-      const {id}= parseInt(req.params.id);
+      const id= req.params;
+    
       console.log(req.params);
+
+      console.log(sql.PostgresError)
+      
       const transaction = await sql`
-        SELECT * FROM transactions WHERE id = ${id}
-      `;
-      console.log("transaction:", transaction);
+        SELECT * FROM transactions WHERE user_id =${id}
+      `
+      
+    
       if (transaction.length === 0) {
         return res.status(404).json({ error: 'Transaction not found' });
       }
-      
+      console.log(transaction)
       return res.status(200).json({ data: transaction });
     },
 
-    async getTransactions(c, req, res) {
+     getTransactions: async(c, req, res) =>{
       const transaction = await sql`
         SELECT * FROM transactions 
       `;
