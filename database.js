@@ -63,3 +63,10 @@ async function createTransaction() {
 
 createTransaction()
 
+
+export function getSessionData(sessionId) {
+
+  const sessionData = req.session; 
+
+  return sessionData;
+}
