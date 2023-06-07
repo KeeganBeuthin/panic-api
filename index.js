@@ -9,6 +9,9 @@ import cors from 'cors'
 const { json } = pkg;
 import bcrypt, { hash } from 'bcrypt'
 import session from 'express-session'
+import cookieParser from 'cookie-parser';
+import RedisStore from "connect-redis"
+import {createClient} from "redis"
 
 
 const sql = postgres('postgres://Rat:hahaha@127.0.0.1:5432/Rat')
@@ -16,22 +19,42 @@ const ajv = new Ajv()
 addFormats(ajv)
 
 const app = express();
+
+//client init 
+let redisClient = createClient()
+redisClient.connect().catch(console.error)
+
+// Initialize store.
+let redisStore = new RedisStore({
+  client: redisClient,
+  prefix: "SessionStore:",
+})
+
+
+
 app.use(express.json());
+
+app.set('trust proxy', 1)
+
+
 app.use(
   cors({
-    origin: '*'
+    origin: ["http://localhost:3000/login", "http://localhost:3000", "http://localhost:3000/dashboard", 'http://localhost:9000', 'http://localhost:9000/user/getSession', 'https://app.posthog.com'],
+    methods: ['GET, POST, OPTIONS, PUT, PATCH, DELETE'],
+    credentials: true,
+    allowedHeaders: ['Content-Type, Authorization, credentials']
   })
-)
-
+);
 
 
 app.use(session({
-  secret: 'YourMomIsAHooker',
-  resave: true,
-  saveUninitialized: true,
-  cookie: { secure: false, maxAge:3600000, path:'/' },
+  name: 'info',
+  store: redisStore,
+  secret: '1234',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge:360000000, path:'/', sameSite:'lax', httpOnly:true, secure: true},
 }));
-
 
 
 
@@ -268,7 +291,21 @@ const api = new OpenAPIBackend({
       }},
     },
    }
-  }
+  },
+  '/user/logout':{
+    delete: {
+      operationId: 'logoutUser',
+      requestBody: {
+        content: {
+          'application/json': {
+          }
+        }
+      },
+      responses: {
+        200: {description: 'ok'}
+      },
+    },
+  },
   },
   components: {
     schemas: {
@@ -483,6 +520,10 @@ return res.status(200).json({username: `${name} password updated`})
       SELECT id,username,email,createtime FROM Users WHERE email =${email}
       `
 
+      const Id = await sql`
+      SELECT id FROM Users WHERE email =${email}
+      `
+
       const hash = await sql`
       select password from Users where email = ${email}
       `
@@ -499,36 +540,61 @@ return res.status(200).json({username: `${name} password updated`})
         return res.status(404).json({error: 'user not found'})
       }
 
-      req.session.user = usercheck[0];
-     
-
+      req.session.user= Id[0]
+console.log(req.sessionID)
       console.log(req.session.user)
-      console.log(req.session.id)
+      req.session.save(function (err) {
+        if (err) return (err)
+        console.log('session saved')
+        console.log(req.session)
+        return res.status(200).json({success: 'good'})
+      })
+
+
       
-      return  console.log(req), res.status(200).json({ success: true, sessionId: req.session.Id });
     },
 
 
     getSession: async (c, req, res) => {
-      const sessionId = req.headers['x-session-id'];
-    
+
+      const sessionId = req.sessionID;
+
+    console.log(res)
+console.log(sessionId)
       if (!sessionId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-    
-      function getSessionData(sessionId, callback) {
-        req.sessionStore.get(sessionId, callback);
+       if(typeof sessionId !== 'string')
+       {
+        console.log('invalid')
+       return res.status(400).json({error: 'invalid sessionId'})
+
+       }
+
+      if(typeof sessionId =='string')
+      {console.log('is valid')
+      }
+      
+
+      const sessionData = await redisClient.get(`SessionStore:${sessionId}`)
+
+    console.log(sessionData)
+      
+      if (!sessionData) {
+        return res.status(404).json({ error: 'Session data not found' });
       }
     
-      getSessionData(sessionId, (err, sessionData) => {
-        if (err) {
-          // Handle the error appropriately
-          return res.status(500).json({ error: 'Internal Server Error' });
-        }
+     
+      return res.status(200).json({ sessionData });
+
     
-        res.cookie('sessionid', sessionData);
-        return res.status(200).json({ success: true, data: sessionData });
-      });
+  },
+
+    logoutUser: async (c,req,res) => {
+      res.clearCookie('req.session', { path: '/' });
+
+      return res.status(200).json({success:'cookies deleted'});
+
     },
 
 
