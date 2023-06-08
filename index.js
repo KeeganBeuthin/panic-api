@@ -39,7 +39,7 @@ app.set('trust proxy', 1)
 
 app.use(
   cors({
-    origin: ["http://localhost:3000/login", "http://localhost:3000", "http://localhost:3000/dashboard", 'http://localhost:9000', 'http://localhost:9000/user/getSession', 'https://app.posthog.com'],
+    origin: ["http://localhost:3000/login", "http://localhost:3000", "http://localhost:3000/dashboard",],
     methods: ['GET, POST, OPTIONS, PUT, PATCH, DELETE'],
     credentials: true,
     allowedHeaders: ['Content-Type, Authorization, credentials']
@@ -53,7 +53,7 @@ app.use(session({
   secret: '1234',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge:360000000, path:'/', sameSite:'lax', httpOnly:true, secure: true},
+  cookie: { maxAge:360000000, path:'/', sameSite:'lax', httpOnly:true, secure: false},
 }));
 
 
@@ -101,7 +101,7 @@ const api = new OpenAPIBackend({
       version: '1.0.0',
     },
     paths: {
-      '/transaction': {
+      '/be/transaction': {
         get: {
           operationId: 'getTransactions',
           responses: {
@@ -116,7 +116,7 @@ const api = new OpenAPIBackend({
           },
       },
   },
-  '/transaction/create':{
+  '/be/transaction/create':{
     post: {
       operationId: 'postTransaction',
       requestBody: {
@@ -130,7 +130,7 @@ const api = new OpenAPIBackend({
       },
     },
   },
-      '/transaction/{id}': {
+      '/be/transaction/{id}': {
         get: {
           operationId: 'getTransactionById',
           responses: {
@@ -155,7 +155,7 @@ const api = new OpenAPIBackend({
         },
       ],
     },
-    '/user' :{
+    '/be/user' :{
    get:{
     operationId: 'getUsers',
     responses: {
@@ -170,40 +170,21 @@ const api = new OpenAPIBackend({
     },
    },
     },
-    '/user/{email}/{password}' :{
-      get:{
-       operationId: 'loginUser',
-       responses: {
-         200: {description: 'ok',
-         content:{
-           'application/json':{
-             schema: {
-               $ref: '#/components/schemas/User'
-             }
-           }
-         }},
-       },
+    '/be/user/login' :{
+      post: {
+        operationId: 'loginUser',
+        requestBody: {
+          content: {
+            'application/json': {
+            }
+          }
+        },
+        responses: {
+          200: {description: 'ok'}
+        },
       },
-      parameters: [
-        {
-          name: 'email',
-          in: 'path',
-          schema: {
-            type: 'string',
-          },
-          required: true
-        },
-        {
-          name: 'password',
-          in: 'path',
-          schema: {
-            type: 'string',
-          },
-          required: true
-        },
-      ],
        },
-    '/user/{username}/update':{
+    '/be/user/{username}/update':{
       put: {
         operationId: 'updatePassword',
         requestBody: {
@@ -230,7 +211,7 @@ const api = new OpenAPIBackend({
         },
       ],
     },
-    '/user/{email}': {
+    '/be/user/{email}': {
       get: {
         operationId: 'getUserByDetails',
         responses: {
@@ -263,7 +244,7 @@ const api = new OpenAPIBackend({
       },
     ],
   },
-  '/user/create':{
+  '/be/user/create':{
     post: {
       operationId: 'createUser',
       requestBody: {
@@ -277,7 +258,7 @@ const api = new OpenAPIBackend({
       },
     },
   },
-  '/user/getSession':{
+  '/be/user/getSession':{
    get:{
     operationId: 'getSession',
     responses: {
@@ -292,7 +273,7 @@ const api = new OpenAPIBackend({
     },
    }
   },
-  '/user/logout':{
+  '/be/user/logout':{
     delete: {
       operationId: 'logoutUser',
       requestBody: {
@@ -512,8 +493,7 @@ return res.status(200).json({username: `${name} password updated`})
 
     loginUser: async (c, req, res) => {
       
-      const email = c.request.params.email
-      const password = c.request.params.password
+      const {email,password} = req.body
 
 
       const usercheck = await sql`
@@ -541,12 +521,12 @@ return res.status(200).json({username: `${name} password updated`})
       }
 
       req.session.user= Id[0]
-console.log(req.sessionID)
-      console.log(req.session.user)
+
+
       req.session.save(function (err) {
         if (err) return (err)
         console.log('session saved')
-        console.log(req.session)
+
         return res.status(200).json({success: 'good'})
       })
 
@@ -557,7 +537,7 @@ console.log(req.sessionID)
 
     getSession: async (c, req, res) => {
 
-      const sessionId = req.sessionID;
+      const sessionId = req.session.id;
 
     console.log(res)
 console.log(sessionId)
