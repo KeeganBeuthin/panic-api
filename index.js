@@ -211,9 +211,9 @@ const api = new OpenAPIBackend({
         },
       ],
     },
-    '/be/user/{email}': {
+    '/be/user/profile': {
       get: {
-        operationId: 'getUserByDetails',
+        operationId: 'getProfile',
         responses: {
           200: { description: 'ok',
           content:{
@@ -225,24 +225,6 @@ const api = new OpenAPIBackend({
           }},
         },
     },
-    parameters: [
-      {
-        name: 'email',
-        in: 'path',
-        schema: {
-          type: 'string',
-        },
-        required: true
-      },
-      {
-        name: 'password',
-        in: 'path',
-        schema: {
-          type: 'string',
-        },
-        required: true
-      },
-    ],
   },
   '/be/user/create':{
     post: {
@@ -258,7 +240,7 @@ const api = new OpenAPIBackend({
       },
     },
   },
-  '/be/user/getSession':{
+  '/be/user/session':{
    get:{
     operationId: 'getSession',
     responses: {
@@ -370,6 +352,7 @@ const api = new OpenAPIBackend({
       const transaction = await sql`
       SELECT * FROM transactions WHERE id =${id}
       `
+
      
     
     
@@ -446,21 +429,31 @@ console.log(`new user created with username ${username} and email ${email}`)
 return res.status(200).json({username, email})
     },
 
-    getUserByDetails: async (c, req, res) => {
-      
-      const email = c.request.params.email
-      const pass = c.request.params.password
-      const user = await sql`
-      SELECT username FROM Users WHERE username =${email} and password = ${pass}
-      `
-     
-    
-    
-      if (user.length === 0) {
-        return res.status(404).json({ error: 'user not found' });
-      }
-      console.log(user)
-      return res.status(200).json({user}); 
+    getProfile: async (c, req, res) => {
+      const sessionId = req.session.id;
+
+if(sessionId==undefined){
+  console.log('session undefined')
+  return res.status(400).json({error: 'undefined sessionId'})
+}
+const sessionData = await redisClient.get(`SessionStore:${sessionId}`)
+const values = JSON.parse(sessionData)
+const user= values.user
+
+console.log(user.id)
+if(!sessionData){
+  return res.status(400).json({error:'no user info found'})
+}
+
+
+    const info = await sql`
+    select * from users where id = ${user.id}
+    `
+console.log(info)
+
+    return res.status(200).json(info)
+
+  
     },
 
     updatePassword: async (c,req,res) => {
@@ -494,7 +487,6 @@ return res.status(200).json({username: `${name} password updated`})
     loginUser: async (c, req, res) => {
       
       const {email,password} = req.body
-
 
       const usercheck = await sql`
       SELECT id,username,email,createtime FROM Users WHERE email =${email}
@@ -538,9 +530,7 @@ return res.status(200).json({username: `${name} password updated`})
     getSession: async (c, req, res) => {
 
       const sessionId = req.session.id;
-
-    console.log(res)
-console.log(sessionId)
+      console.log(sessionId)
       if (!sessionId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
@@ -558,12 +548,15 @@ console.log(sessionId)
 
       const sessionData = await redisClient.get(`SessionStore:${sessionId}`)
 
-    console.log(sessionData)
+   
       
       if (!sessionData) {
         return res.status(404).json({ error: 'Session data not found' });
       }
     
+      if(typeof sessionData == null){
+        return res.status(404).json({ error: 'Session data not found' });
+      }
      
       return res.status(200).json({ sessionData });
 
@@ -571,8 +564,12 @@ console.log(sessionId)
   },
 
     logoutUser: async (c,req,res) => {
-      res.clearCookie('req.session', { path: '/' });
+      res.clearCookie('info', { path: '/' });
+      console.log(res.clearCookie)
+      console.log('cleared')
+      req.session.destroy()
 
+      
       return res.status(200).json({success:'cookies deleted'});
 
     },
